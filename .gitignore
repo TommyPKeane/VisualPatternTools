@@ -1,0 +1,20 @@
+# macOS
+**/.DS_Store
+
+# direnv
+**/.direnv/
+
+# venv
+**/.venv/
+
+# Python
+*.pyc
+*.pyo
+**/__pycache__/
+
+# ruff
+**/.ruff_cache/
+
+# pytest
+**/__pytest_cache__/
+**/.coverage
