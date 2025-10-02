@@ -28,7 +28,7 @@ class DatasetSplit(enum.StrEnum):
     The naming convention is setup as:
 
     ```python
-    f"{split-type}_{train_percent}_{validation_percent}_{test_percent}"
+    f"{split - type}_{train_percent}_{validation_percent}_{test_percent}"
     ```
 
     This assumes an industry-standard approach to splitting your full/source Training
@@ -91,6 +91,7 @@ class TrainingDataset:
         - https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
         - https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningDataModule.html
     """
+
     train: torch.Dataset
     validation: torch.Dataset
     test: torch.Dataset
@@ -98,6 +99,50 @@ class TrainingDataset:
     source: torch.Dataset
     source_name: str
     source_version: str
+
+    def to_default_lightning_data_module(
+        self,
+        batch_size: int = 1,
+        num_workers: int = 0,
+        **datamodule_kwargs,
+    ) -> lightning.LightningDataModule:
+        """Create a `lightning.LightningDataModule` instance from the current datasets
+
+        The created `lightning.LightningDataModule` is just the default one, so the
+        dataloaders are auto-generated and relatively simplistic, with shuffling only
+        enabled on the `self.train` dataset.
+
+        If you wanted, you could use this to generate the instance, and then you could
+        do a _post hoc_ override of the `torch.DataLoader` instances if you wanted to
+        further customize it. If you do this, though, you may have to pass the
+        `batch_size` and `num_workers` values to your customized DataLoaders again
+        though.
+
+        Args:
+            batch_size (int, optional): Batch size for the default DataLoaders
+            num_workers (int, optional): Number of Worker Nodes/Subprocesses to use with
+                the DataLoaders. The default value of `0` means that this will be a
+                single process and not distributed on its own. If you're using
+                distributed training, the DataLoaders may still get distributed across
+                to the different Nodes/Subprocesses per your
+            datamodule_kwargs (dict, optional): Keyword arguments that will be passed to
+                the `lightning.LightningDataModule`.
+
+        Returns:
+            lightning.LightningDataModule: New Data Module instance from the current
+                Dataset instances.
+        """
+        data_module_obj = lightning.LightningDataModule.from_datasets(
+            train_dataset=self.train,
+            val_dataset=self.validation,
+            test_dataset=self.test,
+            predict_dataset=None,  # Inference
+            batch_size=batch_size,
+            num_workers=num_workers,
+            **datamodule_kwargs,
+        )
+
+        return data_module_obj
 
 
 def dataset_split_random_r_v_e(
@@ -273,38 +318,3 @@ dataset_splitters_map: dict[DatasetSplit, typing.Callable] = {
     DatasetSplit.random_70_10_20: dataset_split_random_70_10_20,
     DatasetSplit.random_80_10_10: dataset_split_random_80_10_10,
 }
-
-
-# TODO: finish implementation
-# Reference from: https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningDataModule.html#lightning.pytorch.core.LightningDataModule
-# class MyDataModule(lightning.LightningDataModule):
-#     def prepare_data(self):
-#         # download, IO, etc. Useful with shared filesystems
-#         # only called on 1 GPU/TPU in distributed
-#         ...
-
-#     def setup(self, stage):
-#         # make assignments here (val/train/test split)
-#         # called on every process in DDP
-#         dataset = RandomDataset(1, 100)
-#         self.train, self.val, self.test = data.random_split(
-#             dataset, [80, 10, 10], generator=torch.Generator().manual_seed(42)
-#         )
-
-#     def train_dataloader(self):
-#         return data.DataLoader(self.train)
-
-#     def val_dataloader(self):
-#         return data.DataLoader(self.val)
-
-#     def test_dataloader(self):
-#         return data.DataLoader(self.test)
-
-#     def on_exception(self, exception):
-#         # clean up state after the trainer faced an exception
-#         ...
-
-#     def teardown(self):
-#         # clean up state after the trainer stops, delete files...
-#         # called on every process in DDP
-#         ...
